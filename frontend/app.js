@@ -105,8 +105,6 @@ async function run() {
       count === 0
         ? "No matching leads found"
         : `${total.toLocaleString()} leads matched · ${count.toLocaleString()} fetched`;
-    $("summary").textContent = data.summary || "";
-    $("query").textContent = JSON.stringify(data.query, null, 2);
 
     if (data.csv_id) {
       const dl = $("download");
