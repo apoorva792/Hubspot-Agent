@@ -1,0 +1,7 @@
+# Secrets — never commit. Set these in your host's env-var dashboard instead.
+.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc

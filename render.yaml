@@ -1,0 +1,24 @@
+# Render.com Blueprint — deploy with one click via "New + > Blueprint".
+# After it imports, set the secret env vars (sync: false) in the dashboard.
+services:
+  - type: web
+    name: hubspot-lead-agent
+    runtime: python
+    plan: free               # sleeps after ~15 min idle; first request after wakes it (~30-60s)
+    buildCommand: pip install -r backend/requirements.txt
+    # Single worker on purpose: the CSV store lives in memory in one process.
+    startCommand: uvicorn main:app --app-dir backend --host 0.0.0.0 --port $PORT --workers 1
+    healthCheckPath: /api/health
+    envVars:
+      - key: HUBSPOT_TOKEN
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: AUTH_USERNAME
+        sync: false
+      - key: AUTH_PASSWORD
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-sonnet-4-6
+      - key: MAX_RECORDS
+        value: "1000"

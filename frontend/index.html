@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HubSpot Lead Agent</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="dot"></span>
+      <h1>HubSpot Lead Agent</h1>
+    </div>
+    <p class="tagline">Describe the leads you want in plain English. The agent translates it to a HubSpot query, searches your CRM, and hands you a CSV.</p>
+  </header>
+
+  <main>
+    <section class="composer">
+      <textarea id="prompt" rows="3" placeholder="e.g. US-based MQLs in banking we haven't contacted in the last 30 days"></textarea>
+      <div class="row">
+        <div class="chips" id="examples"></div>
+        <button id="run">Fetch leads</button>
+      </div>
+    </section>
+
+    <section id="status" class="status hidden"></section>
+
+    <section id="results" class="results hidden">
+      <div class="result-head">
+        <div>
+          <h2 id="count-line"></h2>
+          <p id="summary"></p>
+        </div>
+        <a id="download" class="download" href="#">⬇ Download CSV</a>
+      </div>
+
+      <details class="query-box">
+        <summary>HubSpot query the agent built</summary>
+        <pre id="query"></pre>
+      </details>
+
+      <div class="table-wrap">
+        <table id="table"></table>
+      </div>
+      <p id="preview-note" class="note"></p>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
