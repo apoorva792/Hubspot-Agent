@@ -130,6 +130,11 @@ async function run() {
 
 renderExamples();
 $("run").onclick = run;
+$("logout").onclick = async (e) => {
+  e.preventDefault();
+  await fetch("/api/logout", { method: "POST" });
+  window.location.href = "/login";
+};
 $("prompt").addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === "Enter") run();
 });

@@ -1,8 +1,9 @@
 """FastAPI app: serves the UI and the /api/search + /api/download endpoints."""
 from __future__ import annotations
 
-import base64
 import csv
+import hashlib
+import hmac
 import io
 import os
 import secrets
@@ -12,7 +13,7 @@ from typing import Optional
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -24,37 +25,40 @@ from hubspot import HubSpot  # noqa: E402
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
-# Single-user HTTP Basic auth. Credentials come from env; defaults match the one
+# Single-user, session-cookie login. Credentials come from env; defaults match the one
 # provisioned user. Override AUTH_USERNAME / AUTH_PASSWORD in production.
 AUTH_USERNAME = os.environ.get("AUTH_USERNAME", "navaneetha.krishnan@lyzr.ai")
 AUTH_PASSWORD = os.environ.get("AUTH_PASSWORD", "navaneetha.krishnan@lyzr.ai")
-# Paths reachable without auth (so deploy platforms can health-check).
-_PUBLIC_PATHS = {"/api/health"}
+
+# The session cookie carries an HMAC derived from the credentials, so it can't be
+# forged and stays valid across restarts (no separate secret to manage). Changing the
+# username/password — or setting SESSION_SECRET — invalidates all existing sessions.
+_SESSION_SECRET = os.environ.get("SESSION_SECRET") or f"{AUTH_USERNAME}:{AUTH_PASSWORD}"
+_SESSION_TOKEN = hmac.new(
+    _SESSION_SECRET.encode(), b"hubspot-lead-agent-session-v1", hashlib.sha256
+).hexdigest()
+_COOKIE_NAME = "hla_session"
+_COOKIE_MAX_AGE = 7 * 24 * 3600  # 7 days
+
+# Reachable without a session: the login page/endpoints, health check, static assets.
+_PUBLIC_PATHS = {"/login", "/api/login", "/api/logout", "/api/health"}
 
 app = FastAPI(title="HubSpot Lead Agent")
 
 
+def _is_authed(request: Request) -> bool:
+    return secrets.compare_digest(request.cookies.get(_COOKIE_NAME, ""), _SESSION_TOKEN)
+
+
 @app.middleware("http")
-async def basic_auth(request: Request, call_next):
-    """Gate every route behind one set of Basic-auth credentials."""
-    if request.url.path in _PUBLIC_PATHS:
+async def auth_gate(request: Request, call_next):
+    """Require a valid session cookie; redirect humans to /login, 401 the API."""
+    path = request.url.path
+    if path in _PUBLIC_PATHS or path.startswith("/static/") or _is_authed(request):
         return await call_next(request)
-    ok = False
-    header = request.headers.get("authorization", "")
-    if header.startswith("Basic "):
-        try:
-            user, _, pw = base64.b64decode(header[6:]).decode("utf-8").partition(":")
-            ok = secrets.compare_digest(user, AUTH_USERNAME) and secrets.compare_digest(
-                pw, AUTH_PASSWORD
-            )
-        except Exception:
-            ok = False
-    if not ok:
-        return Response(
-            status_code=401,
-            headers={"WWW-Authenticate": 'Basic realm="HubSpot Lead Agent"'},
-        )
-    return await call_next(request)
+    if path.startswith("/api/"):
+        return Response(status_code=401)
+    return RedirectResponse("/login", status_code=302)
 
 # In-memory CSV store (fine for a local test tool). id -> csv text.
 _CSV_STORE: dict[str, str] = {}
@@ -72,6 +76,41 @@ _PREFERRED_ORDER = [
 class SearchRequest(BaseModel):
     prompt: str
     model: Optional[str] = None
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+# ----- auth routes -------------------------------------------------------
+@app.get("/login")
+def login_page() -> FileResponse:
+    return FileResponse(FRONTEND_DIR / "login.html")
+
+
+@app.post("/api/login")
+def login(req: LoginRequest, request: Request) -> Response:
+    valid = secrets.compare_digest(req.username, AUTH_USERNAME) and secrets.compare_digest(
+        req.password, AUTH_PASSWORD
+    )
+    if not valid:
+        raise HTTPException(401, "Invalid email or password.")
+    resp = Response(status_code=204)
+    # `secure` only over HTTPS (Render terminates TLS, so trust X-Forwarded-Proto).
+    https = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
+    resp.set_cookie(
+        _COOKIE_NAME, _SESSION_TOKEN, max_age=_COOKIE_MAX_AGE, path="/",
+        httponly=True, samesite="lax", secure=https,
+    )
+    return resp
+
+
+@app.post("/api/logout")
+def logout() -> Response:
+    resp = Response(status_code=204)
+    resp.delete_cookie(_COOKIE_NAME, path="/")
+    return resp
 
 
 def _order_columns(rows: list[dict]) -> list[str]:

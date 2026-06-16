@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign in · HubSpot Lead Agent</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body class="login-body">
+  <form class="login-card" id="login-form">
+    <div class="brand">
+      <span class="dot"></span>
+      <h1>HubSpot Lead Agent</h1>
+    </div>
+    <p class="tagline">Sign in to continue.</p>
+
+    <label for="username">Email</label>
+    <input id="username" type="text" autocomplete="username" autofocus
+           placeholder="you@company.com" />
+
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password"
+           placeholder="••••••••" />
+
+    <button type="submit" id="login-btn">Sign in</button>
+    <p id="login-error" class="login-error hidden"></p>
+  </form>
+
+  <script>
+    const form = document.getElementById("login-form");
+    const errEl = document.getElementById("login-error");
+    const btn = document.getElementById("login-btn");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errEl.classList.add("hidden");
+      btn.disabled = true;
+      try {
+        const res = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: document.getElementById("username").value.trim(),
+            password: document.getElementById("password").value,
+          }),
+        });
+        if (res.ok) {
+          window.location.href = "/";
+          return;
+        }
+        const data = await res.json().catch(() => ({}));
+        errEl.textContent = data.detail || "Invalid email or password.";
+        errEl.classList.remove("hidden");
+      } catch (err) {
+        errEl.textContent = "Something went wrong. Please try again.";
+        errEl.classList.remove("hidden");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
