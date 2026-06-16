@@ -64,7 +64,7 @@ Use-case mapping for THIS portal (verified live — prefer these, don't guess):
   dedups — all deterministically.
 - To restrict to a deal state or loss class (e.g. "recoverable closed-lost deals to
   reactivate", "open deals"), ALSO set `deal_filter`, e.g.
-  {"deal_state": "closed_lost", "loss_class": "recoverable"}. Deal state cannot be
+  {{"deal_state": "closed_lost", "loss_class": "recoverable"}}. Deal state cannot be
   expressed as a contact filterGroup, so always use `deal_filter` for it. Contacts with
   no matching deal are returned separately (off-target), not dropped.
 
